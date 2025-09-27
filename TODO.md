@@ -1,0 +1,3 @@
+- Add different templates for each type of resume item that can be added.
+- Implement the resume editter.
+- Implement the resume builder.
