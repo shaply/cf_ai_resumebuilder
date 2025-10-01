@@ -32,7 +32,7 @@ export interface SkillFormData extends BaseFormData {
   type: 'skill';
 }
 
-export interface ExtracurricularsFormData extends BaseFormData {
+export interface ExtracurricularFormData extends BaseFormData {
   type: 'extracurricular';
   organization: string;
   startDate: string;
