@@ -15,23 +15,25 @@ export interface ResumeItem {
   user_id: number;
   type: ResumeItemType;
   title: string;
+  description: string | null;
+  // Experience fields
   organization: string | null;
   start_date: string | null;
   end_date: string | null;
-  description: string | null;
-  skills: string | null; // JSON string
   location: string | null;
   is_current: boolean;
+  // Project fields
+  tools: string | null; // comma-separated list
+  project_type: 'school' | 'personal' | null;
+  github_link: string | null;
+  // Competition fields
+  award: string | null;
+  resume_item_name: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export enum ResumeItemType {
-    EXPERIENCE = "Work Experience",
-    PROJECT = "Project",
-    COMPETITION = "Competition",
-    SKILL = "Skill"
-}
+export type ResumeItemType = 'experience' | 'project' | 'competition' | 'skill' | 'extracurricular';
 
 export interface GeneratedResume {
   id: number;
@@ -82,21 +84,25 @@ export class DatabaseService {
   async createResumeItem(item: Omit<ResumeItem, 'id' | 'created_at' | 'updated_at'>): Promise<ResumeItem> {
     const result = await this.db.prepare(`
       INSERT INTO resume_items (
-        user_id, type, title, organization, start_date, end_date, 
-        description, skills, location, is_current
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        user_id, type, title, description, organization, start_date, end_date, 
+        location, is_current, tools, project_type, github_link, award, resume_item_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `).bind(
       item.user_id,
       item.type,
       item.title,
+      item.description,
       item.organization,
       item.start_date,
       item.end_date,
-      item.description,
-      item.skills,
       item.location,
-      item.is_current
+      item.is_current,
+      item.tools,
+      item.project_type,
+      item.github_link,
+      item.award,
+      item.resume_item_name
     ).first<ResumeItem>();
 
     if (!result) {
@@ -133,6 +139,10 @@ export class DatabaseService {
       updateFields.push('title = ?');
       values.push(updates.title);
     }
+    if (updates.description !== undefined) {
+      updateFields.push('description = ?');
+      values.push(updates.description);
+    }
     if (updates.organization !== undefined) {
       updateFields.push('organization = ?');
       values.push(updates.organization);
@@ -145,14 +155,6 @@ export class DatabaseService {
       updateFields.push('end_date = ?');
       values.push(updates.end_date);
     }
-    if (updates.description !== undefined) {
-      updateFields.push('description = ?');
-      values.push(updates.description);
-    }
-    if (updates.skills !== undefined) {
-      updateFields.push('skills = ?');
-      values.push(updates.skills);
-    }
     if (updates.location !== undefined) {
       updateFields.push('location = ?');
       values.push(updates.location);
@@ -160,6 +162,26 @@ export class DatabaseService {
     if (updates.is_current !== undefined) {
       updateFields.push('is_current = ?');
       values.push(updates.is_current);
+    }
+    if (updates.tools !== undefined) {
+      updateFields.push('tools = ?');
+      values.push(updates.tools);
+    }
+    if (updates.project_type !== undefined) {
+      updateFields.push('project_type = ?');
+      values.push(updates.project_type);
+    }
+    if (updates.github_link !== undefined) {
+      updateFields.push('github_link = ?');
+      values.push(updates.github_link);
+    }
+    if (updates.award !== undefined) {
+      updateFields.push('award = ?');
+      values.push(updates.award);
+    }
+    if (updates.resume_item_name !== undefined) {
+      updateFields.push('resume_item_name = ?');
+      values.push(updates.resume_item_name);
     }
 
     updateFields.push('updated_at = CURRENT_TIMESTAMP');
@@ -276,7 +298,8 @@ export class DatabaseService {
         title LIKE ? OR 
         organization LIKE ? OR 
         description LIKE ? OR
-        skills LIKE ?
+        tools LIKE ? OR
+        award LIKE ?
       )
       ORDER BY created_at DESC
     `).bind(
@@ -284,6 +307,7 @@ export class DatabaseService {
       `%${searchTerm}%`, 
       `%${searchTerm}%`, 
       `%${searchTerm}%`, 
+      `%${searchTerm}%`,
       `%${searchTerm}%`
     ).all<ResumeItem>();
     

@@ -121,12 +121,29 @@ export default {
     if (url.pathname.startsWith("/api/resume-items")) {
       const { DatabaseService } = await import("./database");
       const db = new DatabaseService(env.DB);
+      const userId = 1; // Demo user
+      
+      // Handle specific item routes: /api/resume-items/:id
+      const pathParts = url.pathname.split('/');
+      const itemId = pathParts[3]; // /api/resume-items/:id
       
       if (request.method === "GET") {
         try {
-          const userId = 1; // Demo user
-          const items = await db.getResumeItemsByUserId(userId);
-          return Response.json({ success: true, data: items });
+          if (itemId && !isNaN(Number(itemId))) {
+            // GET single item
+            const item = await db.getResumeItemById(Number(itemId));
+            if (!item) {
+              return Response.json({ 
+                success: false, 
+                error: "Resume item not found" 
+              }, { status: 404 });
+            }
+            return Response.json({ success: true, data: item });
+          } else {
+            // GET all items for user
+            const items = await db.getResumeItemsByUserId(userId);
+            return Response.json({ success: true, data: items });
+          }
         } catch (error) {
           return Response.json({ 
             success: false, 
@@ -137,7 +154,6 @@ export default {
       
       if (request.method === "POST") {
         try {
-          const userId = 1; // Demo user
           const data = await request.json() as any;
           
           // Basic validation
@@ -162,12 +178,96 @@ export default {
             start_date: data.startDate || null,
             end_date: data.endDate || null,
             description: data.description || null,
-            skills: data.skills ? JSON.stringify(data.skills) : null,
             location: data.location || null,
-            is_current: data.isCurrent || false
+            is_current: data.isCurrent || false,
+            tools: data.tools || null,
+            project_type: data.projectType || null,
+            github_link: data.githubLink || null,
+            award: data.award || null,
+            resume_item_name: data.resumeItemName || null
           });
           
           return Response.json({ success: true, data: item });
+        } catch (error) {
+          return Response.json({ 
+            success: false, 
+            error: error instanceof Error ? error.message : String(error) 
+          }, { status: 500 });
+        }
+      }
+      
+      if (request.method === "PUT") {
+        try {
+          if (!itemId || isNaN(Number(itemId))) {
+            return Response.json({ 
+              success: false, 
+              error: "Valid item ID is required for updates" 
+            }, { status: 400 });
+          }
+          
+          const data = await request.json() as any;
+          
+          // Verify item exists and belongs to user
+          const existingItem = await db.getResumeItemById(Number(itemId));
+          if (!existingItem || existingItem.user_id !== userId) {
+            return Response.json({ 
+              success: false, 
+              error: "Resume item not found" 
+            }, { status: 404 });
+          }
+          
+          const updates: any = {};
+          if (data.type !== undefined) updates.type = data.type;
+          if (data.title !== undefined) updates.title = data.title;
+          if (data.organization !== undefined) updates.organization = data.organization;
+          if (data.startDate !== undefined) updates.start_date = data.startDate;
+          if (data.endDate !== undefined) updates.end_date = data.endDate;
+          if (data.description !== undefined) updates.description = data.description;
+          if (data.location !== undefined) updates.location = data.location;
+          if (data.isCurrent !== undefined) updates.is_current = data.isCurrent;
+          if (data.tools !== undefined) updates.tools = data.tools;
+          if (data.projectType !== undefined) updates.project_type = data.projectType;
+          if (data.githubLink !== undefined) updates.github_link = data.githubLink;
+          if (data.award !== undefined) updates.award = data.award;
+          if (data.resumeItemName !== undefined) updates.resume_item_name = data.resumeItemName;
+          
+          const updatedItem = await db.updateResumeItem(Number(itemId), updates);
+          return Response.json({ success: true, data: updatedItem });
+        } catch (error) {
+          return Response.json({ 
+            success: false, 
+            error: error instanceof Error ? error.message : String(error) 
+          }, { status: 500 });
+        }
+      }
+      
+      if (request.method === "DELETE") {
+        try {
+          if (!itemId || isNaN(Number(itemId))) {
+            return Response.json({ 
+              success: false, 
+              error: "Valid item ID is required for deletion" 
+            }, { status: 400 });
+          }
+          
+          // Verify item exists and belongs to user
+          const existingItem = await db.getResumeItemById(Number(itemId));
+          if (!existingItem || existingItem.user_id !== userId) {
+            return Response.json({ 
+              success: false, 
+              error: "Resume item not found" 
+            }, { status: 404 });
+          }
+          
+          const deleted = await db.deleteResumeItem(Number(itemId));
+          if (deleted) {
+            return Response.json({ success: true, message: "Resume item deleted successfully" });
+          } else {
+            return Response.json({ 
+              success: false, 
+              error: "Failed to delete resume item" 
+            }, { status: 500 });
+          }
         } catch (error) {
           return Response.json({ 
             success: false, 

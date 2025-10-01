@@ -13,15 +13,22 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS resume_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('Work Experience', 'Project', 'Competition', 'Skill')),
+    type TEXT NOT NULL CHECK (type IN ('experience', 'project', 'competition', 'skill', 'extracurricular')),
     title TEXT NOT NULL,
+    description TEXT,
+    -- Experience fields
     organization TEXT,
     start_date DATE,
     end_date DATE,
-    description TEXT,
-    skills TEXT, -- JSON array of skills
     location TEXT,
     is_current BOOLEAN DEFAULT FALSE,
+    -- Project fields
+    tools TEXT, -- comma-separated list of tools/technologies
+    project_type TEXT CHECK (project_type IN ('school', 'personal')),
+    github_link TEXT,
+    -- Competition fields
+    award TEXT,
+    resume_item_name TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
