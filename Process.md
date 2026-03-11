@@ -1,129 +1,289 @@
-## **Template Recommendation**
-The **Cloudflare agents-starter template** you already have is perfect for this project! It provides:
-- ✅ AI chat interface with streaming responses
-- ✅ Tool system with human-in-the-loop confirmation
-- ✅ Modern React UI with dark/light themes
-- ✅ Built-in AI SDK integration
-- ✅ Cloudflare Workers backend
+# Resume Builder Implementation Plan
 
-## **Architecture Overview**
+## 🎯 High-Level Flow
 
-### **Core Components:**
-1. **Frontend (React)**: Resume builder interface, job posting input, preview
-2. **AI Agent (Cloudflare Workers)**: Content generation, optimization, and trimming logic
-3. **LaTeX Compilation Service**: PDF generation
-4. **Storage (Cloudflare KV/R2)**: User data, templates, generated resumes
-
-### **Data Flow:**
 ```
-User Input → AI Analysis → Content Generation → LaTeX Compilation → PDF Output → Optimization Loop
+User Input → AI Session → Resume Enhancement → LaTeX Generation → PDF Output
 ```
 
-## **Technical Approach**
+## 📋 Detailed Implementation Steps
 
-### **1. LaTeX Compilation Options**
-Since Overleaf doesn't have a public API, here are the best alternatives:
+### **Phase 1: AI Session Infrastructure**
 
-**Recommended: LaTeX.Online API**
-- Simple REST API for LaTeX compilation
-- Supports direct .tex file uploads
-- Returns PDF directly
-- Works perfectly with Cloudflare Workers
-
-**Alternative: SwiftLaTeX**
-- Browser-based LaTeX compiler
-- Can run in Workers with WASM
-- More complex but full control
-
-### **2. AI Tools You'll Need**
-Create these tools in your tools.ts:
-
+#### 1.1 Create Durable Object for AI Sessions
+**File:** `src/ai-session.ts`
 ```typescript
-// Generate tailored bullet points
-const generateResumeContent = tool({
-  description: "Generate resume bullet points tailored to a job posting",
-  inputSchema: z.object({
-    activities: z.array(z.object({
-      title: z.string(),
-      description: z.string(),
-      type: z.enum(["project", "competition", "experience", "education"])
-    })),
-    jobPosting: z.string(),
-    maxBullets: z.number().optional()
-  })
-});
-
-// Optimize resume length
-const optimizeResumeLength = tool({
-  description: "Trim resume content to fit one page",
-  inputSchema: z.object({
-    resumeContent: z.string(),
-    currentPageCount: z.number(),
-    targetPages: z.number().default(1)
-  })
-});
-
-// Compile LaTeX to PDF
-const compileLatex = tool({
-  description: "Compile LaTeX resume to PDF",
-  inputSchema: z.object({
-    latexContent: z.string(),
-    templateName: z.string()
-  })
-});
+export class AISession {
+  // Properties
+  private jobPosting: string
+  private jobAnalysis: JobAnalysis | null
+  private resumeItems: ResumeItem[]
+  private processedResults: Map<string, any>
+  
+  // Methods
+  - startSession(jobPosting, userId)
+  - analyzeJob() 
+  - enhanceResumeItems()
+  - generateSkillsSection()
+  - createFinalResume()
+}
 ```
 
-### **3. Required Integrations**
+#### 1.2 Add Session API Endpoints
+**File:** `src/server.ts`
+```typescript
+// Session management
+POST /api/ai-sessions
+  - Create new session
+  - Initialize with job posting + user resume items
+  - Return sessionId
 
-**AI Services:**
-- OpenAI GPT-4 (already in template) for content generation
-- Claude 3.5 Sonnet (optional upgrade) for better reasoning
+POST /api/ai-sessions/:id/enhance-resume
+  - Enhance resume items for job posting
+  - Return ranked & enhanced items
 
-**LaTeX Service:**
-- LaTeX.Online API for compilation
-- Alternative: Local WASM LaTeX compiler
+POST /api/ai-sessions/:id/generate-resume
+  - Create final LaTeX resume
+  - Return downloadable PDF
+```
 
-**Storage:**
-- Cloudflare KV for user profiles and activities
-- Cloudflare R2 for resume templates and generated PDFs
+#### 1.3 Update wrangler.jsonc
+```json
+{
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AI_SESSION",
+        "class_name": "AISession",
+        "script_name": "your-worker"
+      }
+    ]
+  }
+}
+```
 
-**Optional:**
-- Clerk/Auth0 for user authentication
-- Stripe for premium features
+### **Phase 2: AI Processing Logic**
 
-## **Implementation Steps**
+#### 2.1 Job Analysis Function
+```typescript
+async analyzeJob(jobPosting: string): Promise<JobAnalysis> {
+  const prompt = `
+  Analyze this job posting and extract key requirements:
+  
+  JOB POSTING:
+  ${jobPosting}
+  
+  Return JSON:
+  {
+    "requiredSkills": ["skill1", "skill2"],
+    "preferredExperience": ["exp1", "exp2"],
+    "jobLevel": "entry|mid|senior",
+    "industry": "tech|finance|etc",
+    "keywords": ["keyword1", "keyword2"]
+  }
+  `;
+  
+  // Call Cloudflare Workers AI
+  // Store result for reuse
+}
+```
 
-### **Phase 1: Setup & Basic Structure**
-1. Extend the current agents-starter template
-2. Add resume data models (activities, templates, etc.)
-3. Create basic UI for inputting activities and job postings
+#### 2.2 Resume Enhancement Function
+```typescript
+async enhanceResumeItems(): Promise<EnhancedItem[]> {
+  const prompt = `
+  Job Requirements: ${this.jobAnalysis}
+  Resume Items: ${JSON.stringify(this.resumeItems)}
+  
+  Enhance each item for this job. Return JSON:
+  {
+    "items": [
+      {
+        "id": 1,
+        "relevanceScore": 85,
+        "shouldInclude": true,
+        "enhancedBullets": [
+          "Enhanced bullet point 1",
+          "Enhanced bullet point 2"
+        ],
+        "reasoning": "Why this item is relevant"
+      }
+    ]
+  }
+  `;
+  
+  // Process and store results
+}
+```
 
-### **Phase 2: AI Integration**
-1. Build content generation tools
-2. Implement job posting analysis
-3. Create bullet point generation logic
+#### 2.3 Skills Generation Function
+```typescript
+async generateSkillsSection(includedItems: EnhancedItem[]): Promise<string[]> {
+  // Extract skills from included resume items
+  // Match with job requirements
+  // Format as resume-ready skill categories
+}
+```
 
-### **Phase 3: LaTeX Integration**
-1. Set up LaTeX compilation service
-2. Create resume templates in LaTeX
-3. Build template population logic
+### **Phase 3: Frontend Integration**
 
-### **Phase 4: Optimization Loop**
-1. Implement page counting
-2. Build content trimming algorithm
-3. Create iterative optimization process
+#### 3.1 Update BuildResume Component
+**File:** `src/components/Resume/BuildResume.tsx`
+```typescript
+export default function BuildResume() {
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [jobPosting, setJobPosting] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedResume, setGeneratedResume] = useState<string | null>(null);
 
-### **Phase 5: Polish & Features**
-1. Add user authentication
-2. Build template library
-3. Add export options (PDF, LaTeX source)
+  // Functions
+  - handleStartSession()
+  - handleEnhanceResume()
+  - handleGenerateResume()
+  - handleDownloadPDF()
+}
+```
 
-## **Getting Started**
+#### 3.2 UI Components
+```tsx
+// Job posting input
+<Textarea 
+  placeholder="Paste job posting here..."
+  value={jobPosting}
+  onChange={setJobPosting}
+/>
 
-Would you like me to help you:
-1. **Modify the existing template** to start building the resume builder?
-2. **Create the data models** for activities and resume content?
-3. **Set up the LaTeX compilation** integration?
-4. **Build the AI tools** for content generation?
+// Generate button
+<Button onClick={handleGenerateResume}>
+  {isGenerating ? <Loader /> : 'Generate Resume'}
+</Button>
 
-The agents-starter template gives you a perfect foundation - we just need to customize the tools and UI for your specific resume builder use case!
+// Progress indicator
+<div className="space-y-2">
+  ✅ Analyzing job requirements
+  ⏳ Enhancing resume items
+  ⏳ Generating final resume
+</div>
+
+// Download section
+{generatedResume && (
+  <Card>
+    <h3>Resume Generated!</h3>
+    <Button onClick={handleDownloadPDF}>Download PDF</Button>
+    <Button onClick={() => setGeneratedResume(null)}>Generate Another</Button>
+  </Card>
+)}
+```
+
+### **Phase 4: LaTeX Template & PDF Generation**
+
+#### 4.1 Create LaTeX Template
+**File:** `src/templates/resume-template.ts`
+```typescript
+export function generateResumeLatex(data: ResumeData): string {
+  return `
+\\documentclass[11pt,a4paper]{article}
+\\usepackage{geometry}
+\\geometry{margin=0.75in}
+
+\\begin{document}
+\\section*{Experience}
+${data.experience.map(item => `
+\\textbf{${item.title}} \\hfill ${item.dates}
+\\\\${item.organization}
+\\begin{itemize}
+${item.bullets.map(bullet => `\\item ${bullet}`).join('\n')}
+\\end{itemize}
+`).join('\n')}
+
+\\section*{Projects}
+${data.projects.map(item => `...`).join('\n')}
+
+\\section*{Skills}
+${data.skills.join(' • ')}
+\\end{document}
+  `;
+}
+```
+
+#### 4.2 PDF Generation Endpoint
+```typescript
+POST /api/generate-pdf
+  - Accept LaTeX content
+  - Convert to PDF (using external service or Workers)
+  - Return download URL
+```
+
+### **Phase 5: Error Handling & Polish**
+
+#### 5.1 Error States
+```typescript
+// Handle various error cases
+- Invalid job posting
+- LLM API failures
+- Session timeouts
+- PDF generation errors
+```
+
+#### 5.2 Loading States
+```typescript
+// Progress indicators for each step
+- "Analyzing job posting..." (5-10s)
+- "Enhancing resume items..." (10-20s)  
+- "Generating final resume..." (5-10s)
+- "Creating PDF..." (5s)
+```
+
+## 🔄 User Flow Walkthrough
+
+1. **User enters BuildResume page**
+   - Clean form with job posting textarea
+   - "Generate Resume" button (disabled until text entered)
+
+2. **User pastes job posting + clicks Generate**
+   - Create AI session
+   - Show "Analyzing job requirements..." progress
+   - Job analysis completes → show ✅
+
+3. **Resume enhancement begins**
+   - Show "Enhancing your resume items..." progress  
+   - Process user's 14 seed items
+   - Rank and enhance for job fit → show ✅
+
+4. **Final resume generation**
+   - Show "Creating your resume..." progress
+   - Generate LaTeX from enhanced items
+   - Convert to PDF → show ✅
+
+5. **Download ready**
+   - Show success state with download button
+   - Option to generate another resume
+   - Preview of what was included/excluded
+
+## 🎯 Success Criteria
+
+- ✅ **Cloudflare Requirements Met**: LLM + Workflow + Input + State
+- ✅ **User Experience**: 30-60 second generation time
+- ✅ **Cost Efficient**: ~$0.02-0.04 per resume
+- ✅ **Extensible**: Easy to add cover letter, interview prep
+- ✅ **Professional Output**: Clean, one-page PDF resume
+
+## 📁 File Structure After Implementation
+
+```
+src/
+├── ai-session.ts              # Durable Object for AI sessions
+├── server.ts                  # API endpoints (enhanced)
+├── components/Resume/
+│   ├── BuildResume.tsx        # Main resume building interface
+│   └── ResumePreview.tsx      # PDF preview component
+├── templates/
+│   └── resume-template.ts     # LaTeX template
+└── utils/
+    ├── ai-helpers.ts          # LLM prompt utilities
+    └── pdf-utils.ts           # PDF generation helpers
+```
+
+This plan provides a clear roadmap from start to finish. Each phase builds on the previous one, so you can implement incrementally and test as you go!
+
+Ready to start with Phase 1?

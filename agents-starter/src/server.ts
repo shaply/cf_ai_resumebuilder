@@ -16,6 +16,7 @@ import {
 import { createWorkersAI } from "workers-ai-provider";
 import { processToolCalls, cleanupMessages } from "./utils";
 import { tools, executions } from "./tools";
+import { AdvancedJobParser } from "./job-parser";
 
 /**
  * Chat Agent implementation that handles real-time AI chat interactions
@@ -278,6 +279,30 @@ export default {
       
       return Response.json({ error: "Method not allowed" }, { status: 405 });
     }
+
+    if (url.pathname.startsWith("/api/generate-resume")) {
+      if (request.method !== "POST") {
+        return Response.json({ error: "Method not allowed" }, { status: 405 });
+      }
+
+      console.log("Generate resume endpoint hit");
+      const { jobPosting } = await request.json() as any;
+      if (!jobPosting || typeof jobPosting !== "string") {
+        return Response.json(
+          { success: false, error: "jobPosting is required" },
+          { status: 400 }
+        );
+      }
+
+      const keywordsAnalytics = await AdvancedJobParser.analyzeJobPosting(jobPosting);
+      console.log("Keywords and analytics extracted:", keywordsAnalytics);
+      return Response.json({ 
+        success: true, 
+        data: keywordsAnalytics,
+        message: "Job posting analyzed successfully" 
+      });
+    }
+
     return (
       // Route the request to our agent or return 404 if not found
       (await routeAgentRequest(request, env)) ||
